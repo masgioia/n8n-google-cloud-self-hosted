@@ -1,2 +1,116 @@
-# n8n-google-cloud-self-hosted
-Self-hosted n8n on Google Cloud Compute Engine with Docker and secure SSH tunneling.
+# n8n Self-Hosted on Google Cloud
+
+Deploy [n8n](https://n8n.io/) on Google Cloud Compute Engine using Docker, persistent storage, and private editor access through an SSH tunnel.
+
+> **Project status:** starter configuration and deployment notes based on a personal setup. Validate the steps in a test environment before relying on them for production. In the original setup, browser-based Google Cloud SSH worked, but direct SSH authentication from macOS still needed troubleshooting.
+
+## Goals
+
+- Run n8n on a Compute Engine VM.
+- Persist n8n settings, workflows, and credentials in a Docker named volume.
+- Access the editor from a Mac browser through an encrypted SSH tunnel.
+- Keep port 5678 bound to VM loopback instead of exposing the editor directly to the internet.
+- Keep project identifiers, IP addresses, usernames, and secrets out of this public repository.
+
+## Architecture
+
+```text
+Mac browser: http://127.0.0.1:5678
+          |
+          v
+Encrypted SSH local port forwarding (TCP/22)
+          |
+          v
+Google Cloud VM: 127.0.0.1:5678
+          |
+          v
+Docker -> n8n container:5678
+          |
+          v
+Persistent Docker volume: n8n_data
+```
+
+## Prerequisites
+
+- A Google Cloud project and Compute Engine VM running Debian.
+- Docker Engine and the Docker Compose plugin installed on the VM.
+- SSH access to the VM, using a configured SSH key or Google Cloud's browser-based SSH.
+- A Mac with its built-in SSH client and a browser.
+- Google Cloud firewall rules that do not allow public inbound access to TCP/5678.
+
+The original environment used Debian 13, an e2-small VM in `us-central1-b`, and n8n `2.43.6`. These are historical reference values, not requirements or a statement of the latest available release. Review current n8n release notes and cloud pricing before deployment.
+
+## 1. Configure environment variables
+
+Copy `.env.example` to a private `.env` file in the directory where you will run Compose. Generate a strong encryption key:
+
+```sh
+openssl rand -hex 32
+```
+
+Put the generated value in `N8N_ENCRYPTION_KEY` in `.env`. Keep the key stable: changing it can make previously stored credentials unreadable. Back it up securely alongside your n8n data. **Never commit `.env` or the real key.**
+
+## 2. Start n8n
+
+Place `docker-compose.yml` and `.env` in the same private directory on the VM, then run:
+
+```sh
+docker compose up -d
+docker compose ps
+docker compose logs --tail=100 n8n
+```
+
+The configuration publishes the container port only on the VM's loopback address (`127.0.0.1:5678`). The named volume `n8n_data` keeps data when the container is recreated.
+
+## 3. Open the SSH tunnel from macOS
+
+After direct SSH authentication from the Mac is configured, run:
+
+```sh
+chmod +x scripts/open-tunnel.sh
+./scripts/open-tunnel.sh YOUR_VM_EXTERNAL_IP YOUR_LINUX_USERNAME ~/.ssh/YOUR_PRIVATE_KEY
+```
+
+Keep the terminal open and visit [http://127.0.0.1:5678](http://127.0.0.1:5678) in your browser. Stop the tunnel with `Ctrl+C`; this does not stop n8n.
+
+If direct SSH from macOS is not yet configured, use Google Cloud browser-based SSH to administer the VM and troubleshoot SSH authentication. A tunnel started inside Cloud Shell binds to Cloud Shell, not to the Mac; its port preview is a separate access path.
+
+## 4. Verify the binding
+
+On the VM, run:
+
+```sh
+docker compose ps
+docker port n8n 5678
+```
+
+Verify that the host-side binding is `127.0.0.1:5678`, not `0.0.0.0:5678` or the VM's public IP. Review VPC firewall rules as well. Do not expose port 5678 publicly.
+
+## Persistence, backups, and upgrades
+
+- Never remove the `n8n_data` volume as a troubleshooting shortcut.
+- Back up both n8n's persistent data and the matching encryption key.
+- Test restoring a backup before relying on it.
+- Before upgrading, read the release notes, back up the data, and deliberately change the pinned image tag.
+- Avoid using `latest` for a deployment that should be reproducible.
+
+## Security notes
+
+- Never commit `.env`, SSH private keys, workflow exports containing sensitive information, databases, or volume backups.
+- Use a strong n8n owner account password and keep the VM and Docker updated.
+- Keep port 5678 private. SSH tunnelling does not replace n8n's own authentication.
+- External webhook integrations need a separately designed secure endpoint; do not open the editor port publicly to make webhooks work.
+- See [docs/SECURITY.md](docs/SECURITY.md) for a checklist.
+
+## Repository contents
+
+- `docker-compose.yml` — pinned container configuration.
+- `.env.example` — placeholder environment variables.
+- `scripts/open-tunnel.sh` — SSH local port-forward helper.
+- `.gitignore` — excludes local secrets and data.
+- `docs/SECURITY.md` — security checklist.
+- `LICENSE` — MIT license for the repository's original files.
+
+## License and trademarks
+
+Original files in this repository are provided under the MIT License. n8n and Google are separate products; this independent project is not affiliated with or endorsed by either company.
