@@ -64,16 +64,17 @@ The configuration publishes the container port only on the VM's loopback address
 
 ## 3. Open the SSH tunnel from macOS
 
-After direct SSH authentication from the Mac is configured, run:
+Run this command in the Mac Terminal after SSH key authentication is configured. Replace the placeholders with your VM's public IP address, Linux username, and private-key path:
 
 ```sh
-chmod +x scripts/open-tunnel.sh
-./scripts/open-tunnel.sh YOUR_VM_EXTERNAL_IP YOUR_LINUX_USERNAME ~/.ssh/YOUR_PRIVATE_KEY
+ssh -i ~/.ssh/YOUR_SSH_KEY -N -L 127.0.0.1:5678:127.0.0.1:5678 YOUR_LINUX_USERNAME@YOUR_VM_EXTERNAL_IP
 ```
 
-Keep the terminal open and visit [http://127.0.0.1:5678](http://127.0.0.1:5678) in your browser. Stop the tunnel with `Ctrl+C`; this does not stop n8n.
+For example, if your private key is stored at `~/.ssh/n8n_gcp`, use that path in place of `~/.ssh/YOUR_SSH_KEY`. Do not put a real IP address, username, or private key in this public repository.
 
-If direct SSH from macOS is not yet configured, use Google Cloud browser-based SSH to administer the VM and troubleshoot SSH authentication. A tunnel started inside Cloud Shell binds to Cloud Shell, not to the Mac; its port preview is a separate access path.
+Keep the Terminal window open while you use n8n. Visit [http://127.0.0.1:5678](http://127.0.0.1:5678) in your browser. Stop the tunnel with `Ctrl+C`; this does not stop n8n.
+
+If direct SSH from macOS is not working, use Google Cloud browser-based SSH to administer the VM and troubleshoot authentication. A tunnel started inside Cloud Shell binds to Cloud Shell, not to the Mac; its port preview is a separate access path.
 
 ## 4. Verify the binding
 
@@ -106,7 +107,6 @@ Verify that the host-side binding is `127.0.0.1:5678`, not `0.0.0.0:5678` or the
 
 - `docker-compose.yml` — pinned container configuration.
 - `.env.example` — placeholder environment variables.
-- `scripts/open-tunnel.sh` — SSH local port-forward helper.
 - `.gitignore` — excludes local secrets and data.
 - `docs/SECURITY.md` — security checklist.
 - `LICENSE` — MIT license for the repository's original files.
