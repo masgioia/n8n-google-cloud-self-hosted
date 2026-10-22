@@ -40,9 +40,49 @@ Persistent Docker volume: n8n_data
 
 The original environment used Debian 13, an e2-small VM in `us-central1-b`, and n8n `2.43.6`. These are historical reference values, not requirements or a statement of the latest available release. Review current n8n release notes and cloud pricing before deployment.
 
-## 1. Configure environment variables
+## Get the repository files onto the VM using Google Cloud Shell
 
-Copy `.env.example` to a private `.env` file in the directory where you will run Compose. Generate a strong encryption key:
+Google Cloud Shell is a terminal opened from the Google Cloud Console. It is not the VM itself: commands run in Cloud Shell initially affect the Cloud Shell environment. To run Docker commands on the server, first connect to the VM. The steps below clone the public repository **directly onto the VM**, so the Compose file is available where Docker runs.
+
+1. Open the Google Cloud Console and start **Cloud Shell**.
+2. Connect to your Compute Engine VM from Cloud Shell:
+
+   ```sh
+   gcloud compute ssh n8n-server --zone=us-central1-b
+   ```
+
+   Replace the VM name and zone if yours are different. If the command succeeds, your terminal session is now the Debian shell on the VM. Commands entered after this point run on the VM until you disconnect.
+
+3. Check whether Git is installed:
+
+   ```sh
+   git --version
+   ```
+
+   If the command is not found, install Git on Debian only if you are comfortable making that change:
+
+   ```sh
+   sudo apt-get update
+   sudo apt-get install -y git
+   ```
+
+4. Clone the repository onto the VM and enter its directory:
+
+   ```sh
+   git clone https://github.com/masgioia/n8n-google-cloud-self-hosted.git
+   cd n8n-google-cloud-self-hosted
+   ls
+   ```
+
+   The `ls` output should include `docker-compose.yml` and `.env.example`. If the directory already exists, do not run `git clone` again; inspect that directory and update it deliberately instead.
+
+5. At this point, the YAML file is present on the VM. Docker Compose can read it when a command is run from this directory. The file is **not** automatically connected to Cloud Shell or to Docker just because it exists on GitHub.
+
+**Important for an existing n8n installation:** these steps only download the configuration files; they do not change the running container. Do not run `docker compose up -d` yet if n8n is already running. First compare the repository's Compose file with the live container's image, port binding, mounts, environment settings, and persistent volume. Do not create a second `.env` encryption key for an existing installation: n8n's encryption key must match the one used for its stored credentials. Keep the existing volume and key safe.
+
+## 1. Configure environment variables (new deployment only)
+
+For a new deployment, copy `.env.example` to a private `.env` file in the directory where you will run Compose. Generate a strong encryption key:
 
 ```sh
 openssl rand -hex 32
@@ -50,7 +90,9 @@ openssl rand -hex 32
 
 Put the generated value in `N8N_ENCRYPTION_KEY` in `.env`. Keep the key stable: changing it can make previously stored credentials unreadable. Back it up securely alongside your n8n data. **Never commit `.env` or the real key.**
 
-## 2. Start n8n
+For an existing installation, do not replace its encryption key with a newly generated one. Establish the current configuration and key-management arrangement before changing how the container is deployed.
+
+## 2. Start n8n (new deployment or verified migration only)
 
 Place `docker-compose.yml` and `.env` in the same private directory on the VM, then run:
 
@@ -61,6 +103,8 @@ docker compose logs --tail=100 n8n
 ```
 
 The configuration publishes the container port only on the VM's loopback address (`127.0.0.1:5678`). The named volume `n8n_data` keeps data when the container is recreated.
+
+**Do not run these commands against an existing installation until you have verified that the Compose file matches the current container.** A Compose file describes the desired configuration; `docker compose up -d` applies it and may create or change containers.
 
 ## 3. Open the SSH tunnel from macOS
 
