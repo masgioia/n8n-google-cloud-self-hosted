@@ -1,0 +1,27 @@
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa
+id_ed25519
+known_hosts
+
+# n8n runtime data, databases, exports, and backups
+.n8n/
+n8n_data/
+database.sqlite*
+*.sqlite
+*.sqlite3
+*.db
+*.backup
+*.bak
+backups/
+exports/
+
+# Logs and local editor/OS files
+*.log
+.DS_Store
+.vscode/
+.idea/
